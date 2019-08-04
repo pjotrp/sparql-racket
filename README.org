@@ -1,0 +1,67 @@
+* SPARQL implementation in (Racket) Scheme
+
+This package provides simple support for executing SPARQL queries on
+triple store end points (such as wikidata). Features are:
+
+1. Use at-exp to build readable queries in a textual format
+2. Easy debugging of queries so you can copy-paste them
+3. Fetch results using standard [[https://www.w3.org/2001/sw/DataAccess/rf1/][XML]]
+4. Use named variables to fetch results
+
+Later we may add a DSL for building SPARQL queries. Another feature
+may be a mapping from miniKanren.
+
+Enjoy,
+
+Pjotr Prins 2019
+
+* Using SPARQL
+
+Let's start with a wikidata query for fetching wikidata ids for a
+(case sensitive) gene name (Shh in Human Mouse and Rat) e.g.
+
+#+BEGIN_SRC sparl
+SELECT DISTINCT ?wikidata_id
+       WHERE {
+         ?wikidata_id wdt:P31 wd:Q7187 ;
+                      wdt:P703 ?species .
+         VALUES (?species) { (wd:Q15978631) (wd:Q83310) (wd:Q184224) } .
+         ?wikidata_id rdfs:label "Shh"@en .
+         }
+}
+#+END_SRC
+
+which renders two results, one for mouse and one for rat. You can paste
+this query and run it in [[https://query.wikidata.org/#SELECT%20DISTINCT%20%3Fwikidata_id%0A%20%20%20%20%20%20%20WHERE%20%7B%0A%20%20%20%20%20%20%20%20%20%3Fwikidata_id%20wdt%3AP31%20wd%3AQ7187%20%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20wdt%3AP703%20%3Fspecies%20.%0A%20%20%20%20%20%20%20%20%20VALUES%20%28%3Fspecies%29%20%7B%20%28wd%3AQ15978631%29%20%28wd%3AQ83310%29%20%28wd%3AQ184224%29%20%7D%20.%0A%20%20%20%20%20%20%20%20%20%3Fwikidata_id%20rdfs%3Alabel%20%22Shh%22%40en%20.%0A%20%20%20%20%20%20%20%20%20%7D][wikidata]].
+
+To make this query more palatable from Scheme let's modify it using at-exp and
+a few constants:
+
+#+BEGIN_SRC racket
+#lang at-exp racket
+
+(define ps-encoded-by "ps:P702")
+(define wdt-instance-of "wdt:P31")
+(define wdt-in-taxon "wdt:P703")
+(define wd-human "wd:Q15978631")
+(define wd-mouse "wd:Q83310")
+(define wd-rat "wd:Q184224")
+(define wd-gene "wd:Q7187")
+
+(define (sparql_wikidata_id gene_name)
+  @string-append{
+     SELECT DISTINCT ?wikidata_id
+            WHERE {
+              ?wikidata_id @wdt-instance-of @wd-gene ;
+                           @wdt-in-taxon ?species .
+              VALUES (?species) { (@wd-human) (@wd-mouse) (@wd-rat) } .
+              ?wikidata_id rdfs:label "@gene_name"@"@"en .
+              }
+            })
+#+END_SRC
+
+which renders the exact same SPARQL query as above with
+
+#+BEGIN_SRC racket
+(sparql_wikidata_id "Shh")
+#+END_SRC
