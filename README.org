@@ -60,8 +60,20 @@ a few constants:
             })
 #+END_SRC
 
-which renders the exact same SPARQL query as above with
+which renders the exact same original SPARQL query with
 
 #+BEGIN_SRC racket
-(sparql_wikidata_id "Shh")
+(display (sparql_wikidata_id "Shh"))
 #+END_SRC
+
+#+BEGIN_SRC
+SELECT DISTINCT ?wikidata_id
+       WHERE {
+         ?wikidata_id wdt:P31 wd:Q7187 ;
+                      wdt:P703 ?species .
+         VALUES (?species) { (wd:Q15978631) (wd:Q83310) (wd:Q184224) } .
+         ?wikidata_id rdfs:label "Shh"@en .
+         }
+#+END_SRC
+
+which is great for testing output and copy/paste.
