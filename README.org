@@ -5,8 +5,9 @@ triple store end points (such as wikidata). Features are:
 
 1. Use at-exp to build readable queries in a textual format
 2. Easy debugging of queries so you can copy-paste them
-3. Fetch results using standard [[https://www.w3.org/2001/sw/DataAccess/rf1/][XML]]
+3. Fetch results using standard [[https://www.w3.org/2001/sw/DataAccess/rf1/][XML]], JSON and CSV
 4. Use named variables to fetch results
+5. Testing and error handling (important!)
 
 Later we may add a DSL for building SPARQL queries. Another feature
 may be a mapping from miniKanren.
@@ -34,8 +35,12 @@ SELECT DISTINCT ?wikidata_id
 which renders two results, one for mouse and one for rat. You can paste
 this query and run it in [[https://query.wikidata.org/#SELECT%20DISTINCT%20%3Fwikidata_id%0A%20%20%20%20%20%20%20WHERE%20%7B%0A%20%20%20%20%20%20%20%20%20%3Fwikidata_id%20wdt%3AP31%20wd%3AQ7187%20%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20wdt%3AP703%20%3Fspecies%20.%0A%20%20%20%20%20%20%20%20%20VALUES%20%28%3Fspecies%29%20%7B%20%28wd%3AQ15978631%29%20%28wd%3AQ83310%29%20%28wd%3AQ184224%29%20%7D%20.%0A%20%20%20%20%20%20%20%20%20%3Fwikidata_id%20rdfs%3Alabel%20%22Shh%22%40en%20.%0A%20%20%20%20%20%20%20%20%20%7D][wikidata]].
 
-To make this query more palatable from Scheme let's modify it using at-exp and
-a few constants:
+# https://query.wikidata.org/#SELECT%20DISTINCT%20%3Fwikidata_id%0A%20%20%20%20%20%20%20WHERE%20%7B%0A%20%20%20%20%20%20%20%20%20%3Fwikidata_id%20wdt%3AP31%20wd%3AQ7187%20%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20wdt%3AP703%20%3Fspecies%20.%0A%20%20%20%20%20%20%20%20%20VALUES%20%28%3Fspecies%29%20%7B%20%28wd%3AQ15978631%29%20%28wd%3AQ83310%29%20%28wd%3AQ184224%29%20%7D%20.%0A%20%20%20%20%20%20%20%20%20%3Fwikidata_id%20rdfs%3Alabel%20%22Shh%22%40en%20.%0A%20%20%20%20%20%20%20%20%20%7D.
+
+** Creating a SPARQL query using at-exp
+
+To make this query more palatable from Scheme let's modify it using
+[[http://www.greghendershott.com/2015/08/at-expressions.html][at-exp]] and a few constants:
 
 #+BEGIN_SRC racket
 #lang at-exp racket
@@ -60,7 +65,8 @@ a few constants:
             })
 #+END_SRC
 
-which renders the exact same original SPARQL query with
+Now the query is clean and readable and it renders the exact same
+original SPARQL query with
 
 #+BEGIN_SRC racket
 (display (sparql_wikidata_id "Shh"))
@@ -77,3 +83,82 @@ SELECT DISTINCT ?wikidata_id
 #+END_SRC
 
 which is great for testing output and copy/paste.
+
+** Fetch output as JSON/XML
+
+SPARQL end points can return multiple tabular outputs. Typically [[https://www.w3.org/2001/sw/DataAccess/rf1/][XML]],
+[[https://www.w3.org/TR/sparql11-results-json/][JSON]] and some TSV/CSV types. sparql-racket uses XML or JSON by default
+but you won't notice it much though you can override that behaviour
+(NYI).
+
+Output of above query can be fetched with something like
+
+#+BEGIN_SRC racket
+(require net/url)
+(require net/uri-codec)
+
+(define (wikidata-json query)
+  (call/input-url (string->url (string-append "https://query.wikidata.org/sparql?query=" (uri-encode query)))
+                get-pure-port
+                port->string
+                '("Accept: application/json")))
+
+(display (wikidata-json (sparql_wikidata_id "Shh")))
+#+END_SRC
+
+which renders JSON output
+
+#+BEGIN_SRC json
+{
+  "head" : {
+    "vars" : [ "wikidata_id" ]
+  },
+  "results" : {
+    "bindings" : [ {
+      "wikidata_id" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q14860079"
+      }
+    }, {
+      "wikidata_id" : {
+        "type" : "uri",
+        "value" : "http://www.wikidata.org/entity/Q24420953"
+      }
+    } ]
+  }
+}
+#+END_SRC
+
+when you replace the accept with '("Accept: application/xml") the function renders
+
+#+BEGIN_SRC xml
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+	<head>
+		<variable name='wikidata_id'/>
+	</head>
+	<results>
+		<result>
+			<binding name='wikidata_id'>
+				<uri>http://www.wikidata.org/entity/Q14860079</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='wikidata_id'>
+				<uri>http://www.wikidata.org/entity/Q24420953</uri>
+			</binding>
+		</result>
+	</results>
+</sparql>
+#+END_SRC
+
+Whether we use one or the other is probably a matter of taste. We'll
+turn it into a Racket data structure anyway so for the module user it
+should not matter. Maybe a good idea to test performance of your
+application by running a bunch of queries against your preferred
+SPARQL endpoint. One thing of note may be that XML should be better at
+catching errors. Also note that both routes return the 'variable name'
+or column header name. More on that later.
+
+Note that up to this point this is all standard Racket! Now we get to
+module logic.
