@@ -88,8 +88,7 @@ which is great for testing output and copy/paste.
 
 SPARQL end points can return multiple tabular outputs. Typically [[https://www.w3.org/2001/sw/DataAccess/rf1/][XML]],
 [[https://www.w3.org/TR/sparql11-results-json/][JSON]] and some TSV/CSV types. sparql-racket uses XML or JSON by default
-but you won't notice it much though you can override that behaviour
-(NYI).
+but you won't notice it much though you can override that behaviour.
 
 Output of above query can be fetched with something like
 
@@ -159,6 +158,51 @@ application by running a bunch of queries against your preferred
 SPARQL endpoint. One thing of note may be that XML should be better at
 catching errors. Also note that both routes return the 'variable name'
 or column header name. More on that later.
+
+To parse the JSON output you can turn it into a Lisp data structure
+(S-expression) with the string->jsexpr procedure. Unpacking the data can be done
+by walking the structure with something like
+
+#+BEGIN_SRC racket
+(require json)
+
+(define header
+  '("Accept: application/json"))
+
+(define (wikidata-json query)
+  (call/input-url (string->url (string-append "https://query.wikidata.org/sparql?query=" (uri-encode query)))
+                  get-pure-port
+                  (lambda (port)
+                    (string->jsexpr (port->string port))
+                    )
+                  header
+                  ))
+
+;; Get named values from a JSON record returned by a Wikidata SPARQL
+;; query
+(define (wikidata-values json fieldname)
+  (map (lambda (wikidata_id)
+         (hash-ref (hash-ref wikidata_id fieldname) 'value))
+       (hash-ref (hash-ref json 'results) 'bindings))
+  )
+#+END_SRC
+
+where fieldname is 'wikidata_id', e.g.
+
+#+BEGIN_SRC
+(define (wikidata-ids gene-name)
+  (display (sparql_wikidata_id gene-name))
+  (let ([json (wikidata-json (sparql_wikidata_id gene-name))])
+    (let ([values (wikidata-values json 'wikidata_id)])
+      ; (display values)
+      values
+      )))
+
+(wikidata-ids "Shh")
+'("http://www.wikidata.org/entity/Q14860079" "http://www.wikidata.org/entity/Q24420953")
+#+END_SRC
+
+We have a result and it suffices to show that it gets rather ugly.
 
 Note that up to this point this is all standard Racket! Now we get to
 module logic.
