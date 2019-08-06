@@ -202,7 +202,8 @@ where fieldname is 'wikidata_id', e.g.
 '("http://www.wikidata.org/entity/Q14860079" "http://www.wikidata.org/entity/Q24420953")
 #+END_SRC
 
-We have a result and it suffices to show that it gets rather ugly.
+We have a result and it suffices to show that it gets rather ugly if
+you had to write your code like this at every query.
 
 Note that up to this point this is all standard Racket! Now we get to
 module logic.
