@@ -233,4 +233,62 @@ we should be able to do
   (display row-wikidata_id))
 #+END_SRC
 
-to fetch all wikidata_id items.
+to fetch all wikidata_id items. The way to do this is by using
+the [[https://docs.racket-lang.org/reference/define-struct.html][struct]] type since it can name fields and has efficient storage.
+
+#+BEGIN_SRC racket
+(struct row (wikidata_id))
+(row-wikidata_id (make-row "http://www.wikidata.org/entity/Q1486"))
+"http://www.wikidata.org/entity/Q1486"
+#+END_SRC
+
+Unfortunately, I have not yet figured out how to do this at
+runtime. Here we know the variable names at compile time, but for the
+general case we may depend on a user input query where we don't know
+ahead of time. So macros like described [[https://www.greghendershott.com/fear-of-macros/all.html][here]] won't work (great
+article, btw).
+
+I may be able to use dynamic class methods - the way I did someting
+similar in [[https://rubygems.org/gems/bio-table/versions/1.0.0][Ruby bio-table]]. This would lead to more efficient storage
+than hash-table (which matters when we [[https://en.wikipedia.org/wiki/Memoization][memoize]] results in a web
+server). That can be done later on top of an existing data structure.
+
+The alternatives are returning names and values as lists, vectors or
+hashes. An interesting option is a struct of names/values which is
+efficient. Another option may be a [[https://docs.racket-lang.org/data-frame/index.html][data-frame]], but I think that is
+overkill and I don't like adding dependencies for no good reason.
+
+The field names come with the XML output as
+
+#+BEGIN_SRC racket
+(se-path*/list '(variable #:name) exp)
+'("wikidata_id")
+#+END_SRC
+
+With this we can fill names and likewise values for every row. The struct
+type acts as a simple dataframe. We could use a hash style
+
+#+BEGIN_SRC racket
+(define ht #hash(("wikidata_id" . "http://www.wikidata.org/entity/Q24420953")))
+(hash-ref ht "wikidata_id")
+"http://www.wikidata.org/entity/Q24420953"
+#+END_SRC
+
+and vector is another option. But I opt for a simple list initially.
+
+We can fill the list
+
+#+BEGIN_SRC racket
+(define names (se-path*/list '(variable #:name) exp))
+(define values (se-path*/list '(uri) exp))
+
+(struct result (varnames rows) #:prefab)
+(define res (result names values))
+'#s(result ("wikidata_id") ("http://www.wikidata.org/entity/Q14860079" "http://www.wikidata.org/entity/Q24420953"))
+(result-varnames res)
+'("wikidata_id")
+(result-rows res)
+'("http://www.wikidata.org/entity/Q14860079" "http://www.wikidata.org/entity/Q24420953")
+#+END_SRC
+
+almost there where it not that rows should be a list of vector.
