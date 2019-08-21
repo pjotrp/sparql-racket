@@ -291,4 +291,61 @@ We can fill the list
 '("http://www.wikidata.org/entity/Q14860079" "http://www.wikidata.org/entity/Q24420953")
 #+END_SRC
 
-almost there where it not that rows should be a list of vector.
+almost there where it not that rows should be a list of list (or maybe vector). To make
+sure we do the right thing let's request multiple colums
+
+#+BEGIN_SRC
+(define (wikidata_id gene_name)
+  @string-append{
+     SELECT DISTINCT ?species ?wikidata_id
+            WHERE {
+              ?wikidata_id @wdt-instance-of @wd-gene ;
+                           @wdt-in-taxon ?species .
+              VALUES (?species) { (@wd-human) (@wd-mouse) (@wd-rat) } .
+              ?wikidata_id rdfs:label "@gene_name"@"@"en .
+              }
+            })
+#+END_SRC
+
+for 'Shh' results in a table
+
+#+BEGIN_SRC
+species wikidata_id
+http://www.wikidata.org/entity/Q83310   http://www.wikidata.org/entity/Q14860079
+http://www.wikidata.org/entity/Q184224  http://www.wikidata.org/entity/Q24420953
+#+END_SRC
+
+or in XML
+
+#+BEGIN_SRC xml
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+	<head>
+		<variable name='species'/>
+		<variable name='wikidata_id'/>
+	</head>
+	<results>
+		<result>
+			<binding name='species'>
+				<uri>http://www.wikidata.org/entity/Q83310</uri>
+			</binding>
+			<binding name='wikidata_id'>
+				<uri>http://www.wikidata.org/entity/Q14860079</uri>
+			</binding>
+		</result>
+		<result>
+			<binding name='species'>
+				<uri>http://www.wikidata.org/entity/Q184224</uri>
+			</binding>
+			<binding name='wikidata_id'>
+				<uri>http://www.wikidata.org/entity/Q24420953</uri>
+			</binding>
+		</result>
+	</results>
+</sparql>
+#+END_SRC
+
+Now you see we need to seek for the binding name to get the actual
+values, also we split on <uri> which may not work for other
+results(!). Interesting to note, btw that se-path is simply
+[[https://github.com/racket/racket/blob/master/racket/collects/xml/path.rkt#L51][implemented]] with 'match'.
